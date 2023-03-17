@@ -157,12 +157,11 @@ function getBoolVariables(variables: any[]): { [key: string]: boolean } {
 	// ブール型の変数を見つける
 	for (const variable of variables) {
 		if (variable.type === "bool") {
-			boolVars[variable.name] = variable.value === "True
+			boolVars[variable.name] = variable.value === "True";
 		}
 	}
-}
 
-return boolVars;
+	return boolVars;
 }
 
 // ハイライトを適用する関数
