@@ -1,0 +1,89 @@
+{
+  "name": "boolhighlighter",
+  "displayName": "Bool Highlighter",
+  "description": "Pythonデバッグ中にブール変数をハイライトする",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "activationEvents": [
+    "onDebug"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "debuggers": [
+      {
+        "type": "python",
+        "label": "Python: Bool Highlighter",
+        "languages": [
+          "python"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Bool Highlighter",
+      "properties": {
+        "boolhighlighter.updateDelay": {
+          "type": "number",
+          "default": 500,
+          "description": "遅延時間 (ミリ秒)"
+        },
+        "boolhighlighter.updateInterval": {
+          "type": "number",
+          "default": 1000,
+          "description": "ハイライトの更新間隔 (ミリ秒)"
+        },
+        "boolHighlighter.yellowTextColor": {
+          "type": "string",
+          "default": "black",
+          "description": "真のブール値のテキスト色。"
+        },
+        "boolHighlighter.blueTextColor": {
+          "type": "string",
+          "default": "white",
+          "description": "偽のブール値のテキスト色。"
+        },
+        "boolHighlighter.yellowColor": {
+          "type": "string",
+          "default": "yellow",
+          "description": "真のブール値の背景色。"
+        },
+        "boolHighlighter.blueColor": {
+          "type": "string",
+          "default": "blue",
+          "description": "偽のブール値の背景色。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.76.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.53.0",
+    "@typescript-eslint/parser": "^5.53.0",
+    "eslint": "^8.34.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "typescript": "^4.9.5",
+    "@vscode/test-electron": "^2.2.3"
+  }
+}
