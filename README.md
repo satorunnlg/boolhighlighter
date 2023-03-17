@@ -1,3 +1,14 @@
+<pre>
+ ____               _ _           _           _       
+|  _ \             | (_)         (_)         | |      
+| |_) |_   _  __ _ | |_ _ __ ___  _ _ __   __| |___   
+|  _ <| | | |/ _` || | | '__/ _ \| | '_ \ / _` / __|  
+| |_) | |_| | (_| || | | | | (_) | | | | | (_| \__ \  
+|____/ \__, |\__, | |_| |_|  \___/|_|_| |_|\__,_|___/  
+        __/ ||___/                                      
+       |___/                                           
+</pre>
+
 # boolhighlighter README
 
 This is the README for your extension "boolhighlighter". After writing up a brief description, we recommend including the following sections.
