@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <circle cx="64" cy="64" r="48" fill="#ffc107" />
+  <rect x="56" y="40" width="16" height="48" fill="#1e1e1e" />
+  <rect x="40" y="56" width="48" height="16" fill="#1e1e1e" />
+  <circle cx="64" cy="64" r="24" fill="#2196f3" />
+  <rect x="60" y="52" width="8" height="24" fill="#1e1e1e" />
+  <rect x="52" y="60" width="24" height="8" fill="#1e1e1e" />
+  <line x1="0" y1="64" x2="128" y2="64" stroke="#1e1e1e" stroke-width="4" />
+<text x="16" y="48" font-family="'Yu Gothic', 'Meiryo', sans-serif" font-weight="bold" font-size="36" fill="#1e1e1e">T</text>
+<text x="96" y="104" font-family="'Yu Gothic', 'Meiryo', sans-serif" font-weight="bold" font-size="36" fill="#1e1e1e">F</text>
+</svg>
+
