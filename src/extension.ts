@@ -1,3 +1,4 @@
+import { Session } from 'inspector';
 import * as vscode from 'vscode';
 
 // 設定された遅延時間を取得する関数
@@ -12,13 +13,13 @@ function getConfiguredUpdateInterval(): number {
 	return config.get<number>('updateInterval') || 1000;
 }
 
-// イエロー背景のデコレーションタイプを作成
-let yellowDecorationType = vscode.window.createTextEditorDecorationType({
+// 真の値のデコレーションタイプを作成
+let trueDecorationType = vscode.window.createTextEditorDecorationType({
 	backgroundColor: 'yellow'
 });
 
-// ブルー背景のデコレーションタイプを作成
-let blueDecorationType = vscode.window.createTextEditorDecorationType({
+// 偽の値のデコレーションタイプを作成
+let falseDecorationType = vscode.window.createTextEditorDecorationType({
 	backgroundColor: 'blue'
 });
 
@@ -26,22 +27,99 @@ let blueDecorationType = vscode.window.createTextEditorDecorationType({
 function createDecorationTypes() {
 	const config = vscode.workspace.getConfiguration('boolhighlighter');
 
-	const yellowColor = config.get<string>('yellowColor') || 'yellow';
-	const blueColor = config.get<string>('blueColor') || 'blue';
-	const yellowTextColor = config.get<string>('yellowTextColor') || 'black';
-	const blueTextColor = config.get<string>('blueTextColor') || 'white';
+	const trueColor = config.get<string>('trueBackgroundColor') || 'yellow';
+	const falseColor = config.get<string>('falseBackgroundColor') || 'blue';
+	const trueTextColor = config.get<string>('trueTextColor') || 'black';
+	const falseTextColor = config.get<string>('falseTextColor') || 'white';
 
-	// イエロー背景デコレーションタイプを更新
-	yellowDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: yellowColor,
-		color: yellowTextColor
+	// 真の値のデコレーションタイプを更新
+	trueDecorationType = vscode.window.createTextEditorDecorationType({
+		backgroundColor: trueColor,
+		color: trueTextColor
 	});
 
-	// ブルー背景デコレーションタイプを更新
-	blueDecorationType = vscode.window.createTextEditorDecorationType({
-		backgroundColor: blueColor,
-		color: blueTextColor
+	// 偽の値のデコレーションタイプを更新
+	falseDecorationType = vscode.window.createTextEditorDecorationType({
+		backgroundColor: falseColor,
+		color: falseTextColor
 	});
+}
+
+async function getScope(session: vscode.DebugSession, frameId: number): Promise<any | undefined> {
+	const scopesResponse = await session.customRequest('scopes', { frameId });
+	if (scopesResponse && scopesResponse.scopes && scopesResponse.scopes.length > 0) {
+		return scopesResponse.scopes[0]; // 最初のスコープを返す
+	}
+	return undefined;
+}
+
+async function getVariable(session: vscode.DebugSession, scope: any, variableName: string): Promise<any | undefined> {
+	const variablesResponse = await session.customRequest('variables', { variablesReference: scope.variablesReference });
+	for (const variable of variablesResponse.variables) {
+		if (variable.name === variableName) {
+			return variable;
+		}
+	}
+	return undefined;
+}
+
+async function getFrameId(session: vscode.DebugSession): Promise<number | undefined> {
+	try {
+		// threadsリクエストを使用して実行中のスレッドを取得
+		const threadsResponse = await session.customRequest('threads');
+		const threads = threadsResponse.threads;
+
+		// 最初のスレッドを取得
+		const firstThread = threads[0];
+		if (!firstThread) {
+			return undefined;
+		}
+
+		// 最初のスレッドのスタックトレースを取得
+		const stackTraceResponse = await session.customRequest('stackTrace', {
+			threadId: firstThread.id,
+		});
+		const stackFrames = stackTraceResponse.stackFrames;
+
+		// スタックフレームの最初のフレームを取得
+		const firstFrame = stackFrames[0];
+		if (!firstFrame) {
+			return undefined;
+		}
+
+		// 最初のフレームのIDを返す
+		return firstFrame.id;
+	} catch (error) {
+		console.error('Failed to get frame ID:', error);
+		return undefined;
+	}
+}
+
+function getSelectedVariableName(): string | undefined {
+	const editor = vscode.window.activeTextEditor;
+	if (!editor) {
+		return undefined;
+	}
+
+	// アクティブなエディタの選択されたテキストを取得
+	const selectedText = editor.document.getText(editor.selection);
+	return selectedText;
+}
+
+async function toggleValueInDebugSession(session: vscode.DebugSession, frameId: number, variableName: string): Promise<void> {
+	const scope = await getScope(session, frameId);
+	if (!scope) {
+		throw new Error('Failed to get scope.');
+	}
+
+	const variable = await getVariable(session, scope, variableName);
+	if (!variable) {
+		throw new Error('Failed to get variable.');
+	}
+
+	// 値を変更するロジックを実装
+	const newValue = variable.value === 'True' ? 'False' : 'True';
+	await session.customRequest('setVariable', { variablesReference: scope.variablesReference, name: variableName, value: newValue });
 }
 
 // 拡張機能が有効化された際の処理
@@ -51,6 +129,42 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const updateDelay = getConfiguredUpdateDelay();
 	const updateInterval = getConfiguredUpdateInterval();
+
+	// 新しいコマンドを登録
+	const toggleBooleanValue = vscode.commands.registerCommand('boolHighlighter.toggleBooleanValue', async () => {
+		if (!vscode.debug.activeDebugSession) {
+			vscode.window.showErrorMessage('No active debug session found.');
+			return;
+		}
+
+		const frameId = await getFrameId(vscode.debug.activeDebugSession); // フレームIDを取得
+		const variableName = getSelectedVariableName(); // 変数名を取得
+
+		if (frameId && variableName) {
+			const scope = await getScope(vscode.debug.activeDebugSession, frameId);
+			if (!scope) {
+				vscode.window.showErrorMessage('Failed to retrieve scope.');
+				return;
+			}
+
+			const variable = await getVariable(vscode.debug.activeDebugSession, scope, variableName);
+			if (!variable) {
+				vscode.window.showErrorMessage('Failed to retrieve variable.');
+				return;
+			}
+
+			try {
+				await toggleValueInDebugSession(vscode.debug.activeDebugSession, frameId, variableName); // ここで variableName を渡す
+			} catch (error) {
+				vscode.window.showErrorMessage('Failed to toggle boolean value: ' + String(error));
+			}
+		} else {
+			vscode.window.showErrorMessage('Failed to retrieve frameId or variable name.');
+		}
+	});
+
+
+	context.subscriptions.push(toggleBooleanValue);
 
 	// デバッグセッションがアクティブになったときの処理
 	context.subscriptions.push(
@@ -166,8 +280,8 @@ function getBoolVariables(variables: any[]): { [key: string]: boolean } {
 
 // ハイライトを適用する関数
 function applyHighlights(variables: { [key: string]: boolean }, editor: vscode.TextEditor) {
-	const yellowRanges: vscode.Range[] = [];
-	const blueRanges: vscode.Range[] = [];
+	const trueRanges: vscode.Range[] = [];
+	const falseRanges: vscode.Range[] = [];
 
 	// 変数名ごとにハイライトを適用する
 	for (const variableName in variables) {
@@ -182,24 +296,23 @@ function applyHighlights(variables: { [key: string]: boolean }, editor: vscode.T
 			const startPos = editor.document.positionAt(match.index);
 			const endPos = editor.document.positionAt(match.index + match[0].length);
 			const range = new vscode.Range(startPos, endPos);
-
-			// 変数の値に応じてハイライトの色を適用する
+			// て、ハイライト範囲を追加する
 			if (variableValue) {
-				yellowRanges.push(range);
+				trueRanges.push(range);
 			} else {
-				blueRanges.push(range);
+				falseRanges.push(range);
 			}
 		}
 	}
-
-	editor.setDecorations(yellowDecorationType, yellowRanges);
-	editor.setDecorations(blueDecorationType, blueRanges);
+	// 真および偽の値のハイライトを適用する
+	editor.setDecorations(trueDecorationType, trueRanges);
+	editor.setDecorations(falseDecorationType, falseRanges);
 }
 
 // ハイライトをクリアする関数
 function clearHighlights(editor: vscode.TextEditor) {
-	editor.setDecorations(yellowDecorationType, []);
-	editor.setDecorations(blueDecorationType, []);
+	editor.setDecorations(trueDecorationType, []);
+	editor.setDecorations(falseDecorationType, []);
 }
 
 exports.activate = activate;

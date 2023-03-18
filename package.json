@@ -29,6 +29,20 @@
         }
       }
     ],
+    "commands": [
+      {
+        "command": "boolHighlighter.toggleBooleanValue",
+        "title": "Toggle Boolean Value"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "boolHighlighter.toggleBooleanValue",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "editorTextFocus"
+      }
+    ],
     "configuration": {
       "title": "Bool Highlighter",
       "properties": {
@@ -42,22 +56,22 @@
           "default": 1000,
           "description": "ハイライトの更新間隔 (ミリ秒)"
         },
-        "boolHighlighter.yellowTextColor": {
+        "boolHighlighter.trueTextColor": {
           "type": "string",
           "default": "black",
           "description": "真のブール値のテキスト色。"
         },
-        "boolHighlighter.blueTextColor": {
+        "boolHighlighter.falseTextColor": {
           "type": "string",
           "default": "white",
           "description": "偽のブール値のテキスト色。"
         },
-        "boolHighlighter.yellowColor": {
+        "boolHighlighter.trueBackgroundColor": {
           "type": "string",
           "default": "yellow",
           "description": "真のブール値の背景色。"
         },
-        "boolHighlighter.blueColor": {
+        "boolHighlighter.falseBackgroundColor": {
           "type": "string",
           "default": "blue",
           "description": "偽のブール値の背景色。"
