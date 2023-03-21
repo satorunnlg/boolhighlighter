@@ -1,5 +1,6 @@
 import { Session } from 'inspector';
 import * as vscode from 'vscode';
+import { DebugProtocol } from "vscode-debugprotocol";
 
 // 設定された遅延時間を取得する関数
 function getConfiguredUpdateDelay(): number {
@@ -233,7 +234,12 @@ async function getAvailableThread(debugSession: vscode.DebugSession): Promise<an
 // ハイライトを更新する関数
 async function updateHighlights(retryCount = 0) {
 	const editor = vscode.window.activeTextEditor;
-	if (!editor || !vscode.debug.activeDebugSession) {
+	if (!editor) {
+		return;
+	}
+
+	if (!vscode.debug.activeDebugSession) {
+		clearHighlights(editor);
 		return;
 	}
 
@@ -250,9 +256,8 @@ async function updateHighlights(retryCount = 0) {
 		const localScope = scopes.scopes.find((scope: any) => scope.name === 'Locals');
 
 		if (localScope) {
-			const localVariablesResponse = await vscode.debug.activeDebugSession.customRequest('variables', { variablesReference: localScope.variablesReference });
-			const localVariables = localVariablesResponse.variables;
-			const boolVariables = getBoolVariables(localVariables);
+			const localVariables = await getBoolVariables(vscode.debug.activeDebugSession, localScope);
+			const boolVariables = localVariables;
 
 			applyHighlights(boolVariables, editor);
 		}
@@ -264,14 +269,56 @@ async function updateHighlights(retryCount = 0) {
 	}
 }
 
+async function getNestedVariables(
+	session: vscode.DebugSession,
+	variablesReference: number,
+	maxDepth: number,
+	currentDepth: number = 0,
+	seenReferences: Set<number> = new Set()
+): Promise<DebugProtocol.Variable[]> {
+	if (seenReferences.has(variablesReference) || currentDepth >= maxDepth) {
+		return [];
+	}
+	seenReferences.add(variablesReference);
+
+	const variables: DebugProtocol.Variable[] = [];
+	const response = await session.customRequest("variables", { variablesReference });
+
+	for (const variable of response.variables) {
+		variables.push(variable);
+
+		if (variable.variablesReference > 0) {
+			const nestedVariables = await getNestedVariables(
+				session,
+				variable.variablesReference,
+				maxDepth,
+				currentDepth + 1,
+				seenReferences
+			);
+			variables.push(...nestedVariables);
+		}
+	}
+
+	return variables;
+}
+
 // ブール変数を抽出する関数
-function getBoolVariables(variables: any[]): { [key: string]: boolean } {
+async function getBoolVariables(session: vscode.DebugSession, localScope: any): Promise<{ [key: string]: boolean }> {
 	const boolVars: { [key: string]: boolean } = {};
+
+	const variables = await getNestedVariables(session, localScope.variablesReference, 2);
 
 	// ブール型の変数を見つける
 	for (const variable of variables) {
 		if (variable.type === "bool") {
-			boolVars[variable.name] = variable.value === "True";
+			if (variable.evaluateName)
+			{
+				boolVars[variable.evaluateName] = variable.value === "True";
+			}
+			else
+			{
+				boolVars[variable.name] = variable.value === "True";
+			}
 		}
 	}
 
@@ -287,7 +334,8 @@ function applyHighlights(variables: { [key: string]: boolean }, editor: vscode.T
 	for (const variableName in variables) {
 		const variableValue = variables[variableName];
 
-		const regex = new RegExp(`\\b${variableName}\\b`, 'g');
+		const escapedVariableName = variableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 特殊文字をエスケープ
+		const regex = new RegExp(`(?<![a-zA-Z0-9_$])${escapedVariableName}(?![a-zA-Z0-9_$])`, 'g');
 		const text = editor.document.getText();
 
 		let match;
