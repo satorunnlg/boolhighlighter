@@ -2,7 +2,7 @@
   "name": "boolhighlighter",
   "displayName": "Bool Highlighter",
   "description": "Pythonデバッグ中にブール変数をハイライトする",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "engines": {
     "vscode": "^1.76.0"
   },
@@ -48,7 +48,7 @@
       "properties": {
         "boolhighlighter.updateDelay": {
           "type": "number",
-          "default": 500,
+          "default": 100,
           "description": "遅延時間 (ミリ秒)"
         },
         "boolhighlighter.updateInterval": {
