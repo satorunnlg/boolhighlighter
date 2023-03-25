@@ -213,6 +213,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// 新しいコマンドを登録（ブール値をトグルする機能）
 	const toggleBooleanValue = vscode.commands.registerCommand('boolHighlighter.toggleBooleanValue', async () => {
+		// 対象がPythonファイルではない場合何もしない
+		const editor = vscode.window.activeTextEditor;
+		if (editor && editor.document.languageId !== "python") {
+			return;
+		}
 		// アクティブなデバッグセッションが存在しない場合、エラーメッセージを表示して処理を終了
 		if (!vscode.debug.activeDebugSession) {
 			vscode.window.showErrorMessage('No active debug session found.');
@@ -265,6 +270,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// デバッグセッションがアクティブになったときの処理
 	context.subscriptions.push(
 		vscode.debug.onDidChangeActiveDebugSession(async () => {
+			// 対象がPythonファイルではない場合何もしない
+			const editor = vscode.window.activeTextEditor;
+			if (editor && editor.document.languageId !== "python") {
+				return;
+			}
 			if (vscode.debug.activeDebugSession) {
 				// デバッグ開始後にハイライトを更新するための遅延
 				setTimeout(() => {
@@ -281,6 +291,10 @@ export function activate(context: vscode.ExtensionContext) {
 	// アクティブなテキストエディタが変更されたときの処理
 	context.subscriptions.push(
 		vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+			// 対象がPythonファイルではない場合何もしない
+			if (editor && editor.document.languageId !== "python") {
+				return;
+			}
 			if (vscode.debug.activeDebugSession) {
 				// アクティブなエディタが変更された後にハイライトを更新するための遅延
 				setTimeout(() => {
@@ -314,6 +328,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// 一定間隔でハイライトを更新する処理
 	const updateHighlightsInterval = setInterval(() => {
+		// 対象がPythonファイルではない場合何もしない
+		const editor = vscode.window.activeTextEditor;
+		if (editor && editor.document.languageId !== "python") {
+			return;
+		}
 		if (vscode.debug.activeDebugSession) {
 			updateHighlights();
 		}
