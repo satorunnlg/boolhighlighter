@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { DebugProtocol } from "vscode-debugprotocol";
 
 let updateInProgress = false;
+let closeSession = false;
 
 // 設定された遅延時間を取得する関数
 function getConfiguredUpdateDelay(): number {
@@ -276,6 +277,8 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 			if (vscode.debug.activeDebugSession) {
+				updateInProgress = false;
+				closeSession = false;
 				// デバッグ開始後にハイライトを更新するための遅延
 				setTimeout(() => {
 					const startTime = performance.now();
@@ -344,6 +347,8 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.debug.onDidTerminateDebugSession((session) => {
 			if (vscode.window.activeTextEditor) {
+				updateInProgress = false;
+				closeSession = true;
 				clearHighlights(vscode.window.activeTextEditor);
 			}
 		})
@@ -377,6 +382,9 @@ async function getAvailableThread(debugSession: vscode.DebugSession): Promise<an
 
 // ハイライトを更新する関数
 async function updateHighlights(retryCount = 0) {
+	if (closeSession) {
+		return;
+	}
 	if (updateInProgress) {
 		return;
 	}
@@ -412,7 +420,7 @@ async function updateHighlights(retryCount = 0) {
 		}
 	} catch (err) {
 		console.error('ハイライト更新中にエラーが発生:', err);
-		if (retryCount < 3) {
+		if ((!closeSession) && (retryCount < 3)) {
 			setTimeout(() => updateHighlights(retryCount + 1), 500);
 		}
 	}

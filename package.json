@@ -2,7 +2,7 @@
   "name": "boolhighlighter",
   "displayName": "Bool Highlighter",
   "description": "Pythonデバッグ中にブール変数をハイライトする",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "engines": {
     "vscode": "^1.76.0"
   },
