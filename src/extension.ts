@@ -1,7 +1,7 @@
 import { Session } from 'inspector';
 import { performance } from 'perf_hooks';
 import * as vscode from 'vscode';
-import { DebugProtocol } from "vscode-debugprotocol";
+import { DebugProtocol } from "@vscode/debugprotocol";
 
 let updateInProgress = false;
 let closeSession = false;
@@ -301,11 +301,11 @@ export function activate(context: vscode.ExtensionContext) {
 			if (vscode.debug.activeDebugSession) {
 				// アクティブなエディタが変更された後にハイライトを更新するための遅延
 				setTimeout(() => {
-					const startTime = performance.now();
+					// const startTime = performance.now();
 					updateHighlights(); // ハイライトを更新する関数を呼び出し
-					const endTime = performance.now();
-					// 処理にかかった実行時間をコンソールに出力
-					console.log("Step run1 Time : " + (endTime - startTime));
+					// const endTime = performance.now();
+					// // 処理にかかった実行時間をコンソールに出力
+					// console.log("Step run1 Time : " + (endTime - startTime));
 				}, updateDelay); // 必要に応じて遅延時間を調整
 			}
 		})
@@ -337,7 +337,11 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		if (vscode.debug.activeDebugSession) {
+			// const startTime = performance.now();
 			updateHighlights();
+			// const endTime = performance.now();
+			// // 処理にかかった実行時間をコンソールに出力
+			// console.log("Step run1 Time : " + (endTime - startTime));
 		}
 	}, updateInterval);
 	context.subscriptions.push({ dispose: () => clearInterval(updateHighlightsInterval) });
@@ -432,7 +436,7 @@ async function updateHighlights(retryCount = 0) {
 async function getBoolVariables(session: vscode.DebugSession, localScope: any): Promise<{ [key: string]: boolean }> {
 	const boolVars: { [key: string]: boolean } = {};
 
-	const variables = await getNestedVariables(session, localScope.variablesReference, 2);
+	const variables = await getNestedVariables(session, localScope.variablesReference, 4);
 
 	// ブール型の変数を見つける
 	for (const variable of variables) {
