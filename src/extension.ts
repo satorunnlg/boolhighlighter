@@ -386,23 +386,25 @@ async function getAvailableThread(debugSession: vscode.DebugSession): Promise<an
 
 // ハイライトを更新する関数
 async function updateHighlights(retryCount = 0) {
-	if (closeSession) {
-		return;
-	}
-	if (updateInProgress) {
-		return;
-	}
-	updateInProgress = true;
+        if (closeSession) {
+                return;
+        }
+        if (updateInProgress) {
+                return;
+        }
+        updateInProgress = true;
 
-	const editor = vscode.window.activeTextEditor;
-	if (!editor) {
-		return;
-	}
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+                updateInProgress = false;
+                return;
+        }
 
-	if (!vscode.debug.activeDebugSession) {
-		clearHighlights(editor);
-		return;
-	}
+        if (!vscode.debug.activeDebugSession) {
+                clearHighlights(editor);
+                updateInProgress = false;
+                return;
+        }
 
 	try {
 		// 最初の利用可能なスレッドを取得
