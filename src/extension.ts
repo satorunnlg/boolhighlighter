@@ -4,6 +4,9 @@ import { DebugProtocol } from "@vscode/debugprotocol";
 
 let updateInProgress = false;
 let closeSession = false;
+let isDebugStopped = false;
+let updateIntervalTimer: NodeJS.Timeout | undefined;
+let cachedBoolVariables: { [key: string]: boolean } = {};
 
 // 設定された遅延時間を取得する関数
 function getConfiguredUpdateDelay(): number {
@@ -223,7 +226,6 @@ export function activate(context: vscode.ExtensionContext) {
 	createDecorationTypes();
 
 	const updateDelay = getConfiguredUpdateDelay();
-	const updateInterval = getConfiguredUpdateInterval();
 
 	// 新しいコマンドを登録（ブール値をトグルする機能）
 	const toggleBooleanValue = vscode.commands.registerCommand('boolHighlighter.toggleBooleanValue', async () => {
@@ -290,8 +292,13 @@ export function activate(context: vscode.ExtensionContext) {
 				return;
 			}
 			if (vscode.debug.activeDebugSession) {
+				console.log('[BoolHighlighter] Debug session activated');
 				updateInProgress = false;
 				closeSession = false;
+				isDebugStopped = true; // デバッグ開始時は停止中として扱う
+				// キャッシュをクリア
+				cachedBoolVariables = {};
+
 				// デバッグ開始後にハイライトを更新するための遅延
 				setTimeout(() => {
 					const startTime = performance.now();
@@ -300,6 +307,9 @@ export function activate(context: vscode.ExtensionContext) {
 					// 処理にかかった実行時間をコンソールに出力
 					console.log("Activate Time : " + (endTime - startTime));
 				}, updateDelay); // 必要に応じて遅延時間を調整
+
+				// ポーリングを開始
+				startPolling();
 			}
 		})
 	);
@@ -324,52 +334,84 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	// // ステップ実行が完了したときの処理
-	// context.subscriptions.push(
-	// 	vscode.debug.onDidReceiveDebugSessionCustomEvent(async (event) => {
-	// 		if (event.event === 'stopped') {
-	// 			if (vscode.debug.activeDebugSession) {
-	// 				// ステップ実行後にハイライトを更新するための遅延
-	// 				setTimeout(() => {
-	// 					const startTime = performance.now();
-	// 					updateHighlights(); // ハイライトを更新する関数を呼び出し
-	// 					const endTime = performance.now();
-	// 					// 処理にかかった実行時間をコンソールに出力
-	// 					console.log("Step run Time : " + (endTime - startTime));
-	// 				}, updateDelay); // 必要に応じて遅延時間を調整
-	// 			}
-	// 		}
-	// 	})
-	// );
+	// ステップ実行が完了したとき(stopped)の処理
+	context.subscriptions.push(
+		vscode.debug.onDidReceiveDebugSessionCustomEvent(async (event) => {
+			console.log('[BoolHighlighter] Debug event received: ' + event.event);
+			// 対象がPythonファイルではない場合何もしない
+			const editor = vscode.window.activeTextEditor;
+			if (editor && editor.document.languageId !== "python") {
+				return;
+			}
+			if (event.event === 'stopped') {
+				if (vscode.debug.activeDebugSession) {
+					console.log('[BoolHighlighter] Debug stopped event received, updating highlights');
+					isDebugStopped = true;
 
-	// 一定間隔でハイライトを更新する処理
-	const updateHighlightsInterval = setInterval(() => {
-		// 対象がPythonファイルではない場合何もしない
-		const editor = vscode.window.activeTextEditor;
-		if (editor && editor.document.languageId !== "python") {
-			return;
-		}
-		if (vscode.debug.activeDebugSession) {
-			// const startTime = performance.now();
-			updateHighlights();
-			// const endTime = performance.now();
-			// // 処理にかかった実行時間をコンソールに出力
-			// console.log("Step run1 Time : " + (endTime - startTime));
-		}
-	}, updateInterval);
-	context.subscriptions.push({ dispose: () => clearInterval(updateHighlightsInterval) });
+					// ステップ実行後にハイライトを更新するための遅延
+					setTimeout(() => {
+						updateHighlights(); // ハイライトを更新する関数を呼び出し
+					}, updateDelay); // 必要に応じて遅延時間を調整
+
+					// 停止中のポーリングを開始
+					startPolling();
+				}
+			} else if (event.event === 'continued') {
+				// 実行再開時はポーリングを停止
+				console.log('[BoolHighlighter] Debug continued event received, stopping polling');
+				isDebugStopped = false;
+				stopPolling();
+			}
+		})
+	);
 
 
 	// デバッグセッションが終了したときの処理
 	context.subscriptions.push(
 		vscode.debug.onDidTerminateDebugSession((session) => {
+			console.log('[BoolHighlighter] Debug session terminated');
+			// セッション終了フラグを先に設定して、進行中の処理をキャンセル
+			closeSession = true;
+			isDebugStopped = false;
+			stopPolling();
+
 			if (vscode.window.activeTextEditor) {
 				updateInProgress = false;
-				closeSession = true;
+				// キャッシュをクリア
+				cachedBoolVariables = {};
 				clearHighlights(vscode.window.activeTextEditor);
 			}
 		})
 	);
+}
+
+// 停止中のポーリングを開始する関数
+function startPolling() {
+	// 既存のタイマーがあればクリア
+	stopPolling();
+
+	const updateInterval = getConfiguredUpdateInterval();
+	console.log('[BoolHighlighter] Starting polling with interval=' + updateInterval + 'ms');
+
+	updateIntervalTimer = setInterval(() => {
+		// 対象がPythonファイルではない場合何もしない
+		const editor = vscode.window.activeTextEditor;
+		if (editor && editor.document.languageId !== "python") {
+			return;
+		}
+		if (isDebugStopped && vscode.debug.activeDebugSession) {
+			updateHighlights();
+		}
+	}, updateInterval);
+}
+
+// ポーリングを停止する関数
+function stopPolling() {
+	if (updateIntervalTimer) {
+		console.log('[BoolHighlighter] Stopping polling');
+		clearInterval(updateIntervalTimer);
+		updateIntervalTimer = undefined;
+	}
 }
 
 // 利用可能なスレッドを取得する関数
@@ -386,8 +428,11 @@ async function getAvailableThread(debugSession: vscode.DebugSession): Promise<an
 			if (firstThread) {
 				return firstThread;
 			}
-		} catch (err) {
-			console.error('スレッド取得中にエラーが発生:', err);
+		} catch (err: any) {
+			// セッション終了時のCanceledエラーは想定内なのでログに出力しない
+			if (err?.name !== 'Canceled' && err?.message !== 'Canceled') {
+				console.error('スレッド取得中にエラーが発生:', err);
+			}
 		}
 
 		retryCount++;
@@ -400,45 +445,77 @@ async function getAvailableThread(debugSession: vscode.DebugSession): Promise<an
 // ハイライトを更新する関数
 async function updateHighlights(retryCount = 0) {
 	if (closeSession) {
+		console.log('[BoolHighlighter] updateHighlights: closeSession is true, skipping');
 		return;
 	}
 	if (updateInProgress) {
+		console.log('[BoolHighlighter] updateHighlights: updateInProgress is true, skipping');
 		return;
 	}
 	updateInProgress = true;
+	console.log('[BoolHighlighter] updateHighlights: starting (retryCount=' + retryCount + ')');
 
 	try {
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
+			console.log('[BoolHighlighter] updateHighlights: no active editor');
 			return;
 		}
 
 		if (!vscode.debug.activeDebugSession) {
+			console.log('[BoolHighlighter] updateHighlights: no active debug session, clearing highlights');
 			clearHighlights(editor);
 			return;
 		}
 
+		console.log('[BoolHighlighter] updateHighlights: getting available thread');
 		// 最初の利用可能なスレッドを取得
 		const firstThread = await getAvailableThread(vscode.debug.activeDebugSession);
+		console.log('[BoolHighlighter] updateHighlights: thread obtained, id=' + firstThread.id);
 
 		// トップのスタックフレームを取得
 		const stackTrace = await vscode.debug.activeDebugSession.customRequest('stackTrace', { threadId: firstThread.id });
+		console.log('[BoolHighlighter] updateHighlights: stackFrames count=' + stackTrace.stackFrames.length);
+
+		if (!stackTrace.stackFrames || stackTrace.stackFrames.length === 0) {
+			console.log('[BoolHighlighter] updateHighlights: no stack frames available');
+			return;
+		}
+
 		const topFrameId = stackTrace.stackFrames[0].id;
+		console.log('[BoolHighlighter] updateHighlights: stack frame obtained, id=' + topFrameId);
 
 		// トップのスタックフレーム内の変数を取得
 		const scopes = await vscode.debug.activeDebugSession.customRequest('scopes', { frameId: topFrameId });
 		const localScope = scopes.scopes.find((scope: any) => scope.name === 'Locals');
+		console.log('[BoolHighlighter] updateHighlights: local scope found=' + (localScope ? 'yes' : 'no'));
 
 		if (localScope) {
-			const localVariables = await getBoolVariables(vscode.debug.activeDebugSession, localScope);
-			const boolVariables = localVariables;
+			const localVariables = await getBoolVariables(vscode.debug.activeDebugSession, localScope, topFrameId);
+			const count = Object.keys(localVariables).length;
+			console.log('[BoolHighlighter] updateHighlights: bool variables count=' + count);
+
+			// 変数が十分に取得できた場合はキャッシュを更新
+			// 取得数が少ない場合はDAPの状態によって情報が不完全な可能性があるため、キャッシュを使用
+			let boolVariables = localVariables;
+			if (count > 0) {
+				// 新しい変数情報でキャッシュを更新
+				console.log('[BoolHighlighter] updateHighlights: updating cache with ' + count + ' variables');
+				cachedBoolVariables = { ...cachedBoolVariables, ...localVariables };
+			} else if (Object.keys(cachedBoolVariables).length > 0) {
+				// キャッシュが存在する場合はキャッシュを使用
+				console.log('[BoolHighlighter] updateHighlights: using cached variables (' + Object.keys(cachedBoolVariables).length + ' variables)');
+				boolVariables = cachedBoolVariables;
+			}
 
 			applyHighlights(boolVariables, editor);
+			console.log('[BoolHighlighter] updateHighlights: highlights applied successfully');
 		}
 	} catch (err) {
+		// デバッグモードに関係なく常にエラーログを出力
+		console.error('[BoolHighlighter] ハイライト更新中にエラーが発生:', err);
 		const debugMode = getConfiguredDebugMode();
 		if (debugMode) {
-			console.error('ハイライト更新中にエラーが発生:', err);
 			vscode.window.showWarningMessage(`Bool Highlighter: ${err}`);
 		}
 		if ((!closeSession) && (retryCount < 3)) {
@@ -451,15 +528,19 @@ async function updateHighlights(retryCount = 0) {
 }
 
 // ブール変数を抽出する関数
-async function getBoolVariables(session: vscode.DebugSession, localScope: any): Promise<{ [key: string]: boolean }> {
+async function getBoolVariables(session: vscode.DebugSession, localScope: any, frameId: number): Promise<{ [key: string]: boolean }> {
 	const boolVars: { [key: string]: boolean } = {};
 
 	const maxDepth = getConfiguredMaxDepth();
+	console.log('[BoolHighlighter] getBoolVariables: getting nested variables, maxDepth=' + maxDepth + ', variablesReference=' + localScope.variablesReference);
 	const variables = await getNestedVariables(session, localScope.variablesReference, maxDepth);
+	console.log('[BoolHighlighter] getBoolVariables: total variables retrieved=' + variables.length);
 
 	// ブール型の変数を見つける
+	let boolCount = 0;
 	for (const variable of variables) {
 		if (variable.type === "bool") {
+			boolCount++;
 			if (variable.evaluateName)
 			{
 				boolVars[variable.evaluateName] = variable.value === "True";
@@ -469,6 +550,27 @@ async function getBoolVariables(session: vscode.DebugSession, localScope: any): 
 				boolVars[variable.name] = variable.value === "True";
 			}
 		}
+	}
+	console.log('[BoolHighlighter] getBoolVariables: bool variables found=' + boolCount);
+
+	// 変数が少ない場合、キャッシュから変数名を取得して個別に評価
+	if (boolCount === 0 && Object.keys(cachedBoolVariables).length > 0) {
+		console.log('[BoolHighlighter] getBoolVariables: no variables found, refreshing ' + Object.keys(cachedBoolVariables).length + ' cached variables');
+		for (const varName of Object.keys(cachedBoolVariables)) {
+			try {
+				const result = await session.customRequest('evaluate', {
+					expression: varName,
+					frameId: frameId,
+					context: 'watch'
+				});
+				if (result.type === 'bool') {
+					boolVars[varName] = result.result === 'True';
+				}
+			} catch (err) {
+				// 変数が存在しない場合はスキップ（ログなし）
+			}
+		}
+		console.log('[BoolHighlighter] getBoolVariables: refreshed ' + Object.keys(boolVars).length + ' variables from cache');
 	}
 
 	return boolVars;
@@ -488,10 +590,16 @@ async function getNestedVariables(
 	}
 	seenReferences.add(variablesReference);
 
-	const variables: DebugProtocol.Variable[] = [];
+	// start/countパラメータなしで一度だけリクエスト
+	// Python Debug Adapterはページングに対応していないことが判明したため、
+	// シンプルに一度だけリクエストする方が高速
 	const response = await session.customRequest("variables", { variablesReference });
+	const variables: DebugProtocol.Variable[] = response.variables || [];
 
-	for (const variable of response.variables) {
+	// 取得した変数をフィルタリングして処理
+	const processedVariables: DebugProtocol.Variable[] = [];
+
+	for (const variable of variables) {
 		// 特定の型の変数をスキップ
 		if (variable.type === 'NoneType' || variable.type === 'int' || variable.type === 'str' || variable.type === 'float' || variable.type === 'module') {
 			continue;
@@ -499,7 +607,7 @@ async function getNestedVariables(
 		if (variable.type === '' && variable.name !== 'class variables') {
 			continue;
 		}
-		variables.push(variable);
+		processedVariables.push(variable);
 
 		// 変数がネストされている場合、再帰的に取得
 		if (variable.variablesReference > 0) {
@@ -510,7 +618,7 @@ async function getNestedVariables(
 				currentDepth + 1,
 				seenReferences
 			);
-			variables.push(...nestedVariables);
+			processedVariables.push(...nestedVariables);
 		}
 
 		// クラス変数を検出する
@@ -540,11 +648,11 @@ async function getNestedVariables(
 					classVariables[i].evaluateName = className + '.' + classVariables[i].name;
 				}
 			}
-			variables.push(...classVariables);
+			processedVariables.push(...classVariables);
 		}
 	}
 
-	return variables;
+	return processedVariables;
 }
 
 // ハイライトを適用する関数
