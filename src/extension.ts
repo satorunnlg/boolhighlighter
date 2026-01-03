@@ -1,4 +1,3 @@
-import { Session } from 'inspector';
 import { performance } from 'perf_hooks';
 import * as vscode from 'vscode';
 import { DebugProtocol } from "@vscode/debugprotocol";
@@ -18,18 +17,32 @@ function getConfiguredUpdateInterval(): number {
 	return config.get<number>('updateInterval') || 1000;
 }
 
-// 真の値のデコレーションタイプを作成
-let trueDecorationType = vscode.window.createTextEditorDecorationType({
-	backgroundColor: 'yellow'
-});
+// 設定されたネスト深さの最大値を取得する関数
+function getConfiguredMaxDepth(): number {
+	const config = vscode.workspace.getConfiguration('boolhighlighter');
+	return config.get<number>('maxDepth') || 6;
+}
 
-// 偽の値のデコレーションタイプを作成
-let falseDecorationType = vscode.window.createTextEditorDecorationType({
-	backgroundColor: 'blue'
-});
+// デバッグモードの設定を取得する関数
+function getConfiguredDebugMode(): boolean {
+	const config = vscode.workspace.getConfiguration('boolhighlighter');
+	return config.get<boolean>('debugMode') || false;
+}
+
+// デコレーションタイプの変数宣言
+let trueDecorationType: vscode.TextEditorDecorationType;
+let falseDecorationType: vscode.TextEditorDecorationType;
 
 // 設定から色を読み込み、デコレーションタイプを作成する関数
 function createDecorationTypes() {
+	// 既存のデコレーションタイプを破棄してメモリリークを防ぐ
+	if (trueDecorationType) {
+		trueDecorationType.dispose();
+	}
+	if (falseDecorationType) {
+		falseDecorationType.dispose();
+	}
+
 	const config = vscode.workspace.getConfiguration('boolhighlighter');
 
 	const trueColor = config.get<string>('trueBackgroundColor') || 'yellow';
@@ -37,13 +50,13 @@ function createDecorationTypes() {
 	const trueTextColor = config.get<string>('trueTextColor') || 'black';
 	const falseTextColor = config.get<string>('falseTextColor') || 'white';
 
-	// 真の値のデコレーションタイプを更新
+	// 真の値のデコレーションタイプを作成
 	trueDecorationType = vscode.window.createTextEditorDecorationType({
 		backgroundColor: trueColor,
 		color: trueTextColor
 	});
 
-	// 偽の値のデコレーションタイプを更新
+	// 偽の値のデコレーションタイプを作成
 	falseDecorationType = vscode.window.createTextEditorDecorationType({
 		backgroundColor: falseColor,
 		color: falseTextColor
@@ -394,17 +407,17 @@ async function updateHighlights(retryCount = 0) {
 	}
 	updateInProgress = true;
 
-	const editor = vscode.window.activeTextEditor;
-	if (!editor) {
-		return;
-	}
-
-	if (!vscode.debug.activeDebugSession) {
-		clearHighlights(editor);
-		return;
-	}
-
 	try {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			return;
+		}
+
+		if (!vscode.debug.activeDebugSession) {
+			clearHighlights(editor);
+			return;
+		}
+
 		// 最初の利用可能なスレッドを取得
 		const firstThread = await getAvailableThread(vscode.debug.activeDebugSession);
 
@@ -423,20 +436,26 @@ async function updateHighlights(retryCount = 0) {
 			applyHighlights(boolVariables, editor);
 		}
 	} catch (err) {
-		console.error('ハイライト更新中にエラーが発生:', err);
+		const debugMode = getConfiguredDebugMode();
+		if (debugMode) {
+			console.error('ハイライト更新中にエラーが発生:', err);
+			vscode.window.showWarningMessage(`Bool Highlighter: ${err}`);
+		}
 		if ((!closeSession) && (retryCount < 3)) {
 			setTimeout(() => updateHighlights(retryCount + 1), 500);
 		}
+	} finally {
+		// 必ずフラグをリセットする
+		updateInProgress = false;
 	}
-
-	updateInProgress = false;
 }
 
 // ブール変数を抽出する関数
 async function getBoolVariables(session: vscode.DebugSession, localScope: any): Promise<{ [key: string]: boolean }> {
 	const boolVars: { [key: string]: boolean } = {};
 
-	const variables = await getNestedVariables(session, localScope.variablesReference, 4);
+	const maxDepth = getConfiguredMaxDepth();
+	const variables = await getNestedVariables(session, localScope.variablesReference, maxDepth);
 
 	// ブール型の変数を見つける
 	for (const variable of variables) {
@@ -496,6 +515,17 @@ async function getNestedVariables(
 
 		// クラス変数を検出する
 		if (variable.name === 'class variables') {
+			// __class__からクラス名を取得
+			const classVariablesResponse = await session.customRequest('variables', { variablesReference: variable.variablesReference });
+			const classNameVariable = classVariablesResponse.variables.find((v: any) => v.name === '__class__');
+			let className = '';
+
+			if (classNameVariable) {
+				// __class__の値からクラス名を抽出（例: "<class '__main__.MyClass'>" -> "MyClass"）
+				const match = classNameVariable.value.match(/'([^']*\.)?([^'.]*)'/);
+				className = match ? match[2] : '';
+			}
+
 			const classVariables = await getNestedVariables(
 				session,
 				variable.variablesReference,
@@ -503,14 +533,10 @@ async function getNestedVariables(
 				currentDepth,
 				seenReferences
 			);
-			let className = '';
-			for (var i = 0; i < classVariables.length; i++) {
-				if (classVariables[i].type !== 'bool')
-				{
-					className = classVariables[i].name;
-				}
-				else
-				{
+
+			// すべてのbool変数にクラス名を付与
+			for (let i = 0; i < classVariables.length; i++) {
+				if (classVariables[i].type === 'bool' && className) {
 					classVariables[i].evaluateName = className + '.' + classVariables[i].name;
 				}
 			}
@@ -540,7 +566,7 @@ function applyHighlights(variables: { [key: string]: boolean }, editor: vscode.T
 			const startPos = editor.document.positionAt(match.index);
 			const endPos = editor.document.positionAt(match.index + match[0].length);
 			const range = new vscode.Range(startPos, endPos);
-			// て、ハイライト範囲を追加する
+			// 変数の値に応じて、ハイライト範囲を追加する
 			if (variableValue) {
 				trueRanges.push(range);
 			} else {
@@ -561,7 +587,15 @@ function clearHighlights(editor: vscode.TextEditor) {
 
 exports.activate = activate;
 
-function deactivate() { }
+function deactivate() {
+	// リソースを解放してメモリリークを防ぐ
+	if (trueDecorationType) {
+		trueDecorationType.dispose();
+	}
+	if (falseDecorationType) {
+		falseDecorationType.dispose();
+	}
+}
 
 module.exports = {
 	activate,

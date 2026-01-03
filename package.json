@@ -75,6 +75,16 @@
           "type": "string",
           "default": "blue",
           "description": "偽のブール値の背景色。"
+        },
+        "boolhighlighter.maxDepth": {
+          "type": "number",
+          "default": 6,
+          "description": "変数のネスト深さの最大値"
+        },
+        "boolhighlighter.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "デバッグモードを有効にする（エラーメッセージを表示）"
         }
       }
     }
