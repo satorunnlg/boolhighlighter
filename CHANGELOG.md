@@ -4,6 +4,11 @@ All notable changes to the "boolhighlighter" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.6] - 2026-01-03
+
+### Fixed
+- デバッグセッション終了時のCanceledエラーを抑制
+
 ## [0.2.5] - 2026-01-03
 
 ### Added
