@@ -89,16 +89,16 @@
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
     "@types/vscode": "^1.76.0",
-    "@typescript-eslint/eslint-plugin": "^5.53.0",
-    "@typescript-eslint/parser": "^5.53.0",
-    "@vscode/test-electron": "^2.2.3",
-    "eslint": "^8.34.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^8.57.1",
     "glob": "^8.1.0",
-    "mocha": "^10.2.0",
-    "typescript": "^4.9.5"
+    "mocha": "^10.8.2",
+    "typescript": "^5.7.2"
   },
   "publisher": "one-case",
   "icon": "icon.png",
@@ -107,6 +107,6 @@
     "url": "https://github.com/satorunnlg/boolhighlighter.git"
   },
   "dependencies": {
-    "@vscode/debugprotocol": "^1.63.0"
+    "@vscode/debugprotocol": "^1.68.0"
   }
 }
