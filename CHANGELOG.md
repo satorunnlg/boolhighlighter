@@ -4,6 +4,13 @@ All notable changes to the "boolhighlighter" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.7] - 2026-03-14
+
+### Fixed
+- minimatchのReDoS脆弱性を修正（CVE-2026-27903、High）
+  - minimatch 5.1.6 → 5.1.9
+  - minimatch 3.1.2 → 3.1.5
+
 ## [0.2.6] - 2026-01-03
 
 ### Fixed
