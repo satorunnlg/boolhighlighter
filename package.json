@@ -2,7 +2,7 @@
   "name": "boolhighlighter",
   "displayName": "Bool Highlighter",
   "description": "Pythonデバッグ中にブール変数をハイライトする",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "engines": {
     "vscode": "^1.76.0"
   },
@@ -107,7 +107,7 @@
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^8.57.1",
     "glob": "^8.1.0",
-    "mocha": "^10.8.2",
+    "mocha": "^11.3.0",
     "typescript": "^5.7.2"
   },
   "publisher": "one-case",
@@ -115,6 +115,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/satorunnlg/boolhighlighter.git"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.3",
+    "diff": "^8.0.3"
   },
   "dependencies": {
     "@vscode/debugprotocol": "^1.68.0"
