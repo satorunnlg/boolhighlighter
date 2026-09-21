@@ -4,6 +4,22 @@ All notable changes to the "boolhighlighter" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.9] - 2026-09-21
+
+### Fixed
+- Dependabot アラート対応（npm 推移的依存の脆弱性 9 件を `npm audit fix` で修正、拡張機能本体のコード変更なし）
+  - js-yaml: マージキー / !!omap 処理の二次的 CPU 消費 DoS 修正（High、4.3.2 へ更新、GHSA-2883-xcg3-v3hh ほか 3 件）
+  - brace-expansion: 指数時間展開による DoS 修正（High、1.1.21 / 2.1.7 へ更新、GHSA-3jxr-9vmj-r5cp）
+  - flatted: parse() による Prototype Pollution 修正（High、3.4.4 へ更新、GHSA-rf6f-7fwh-wjgh）
+  - serialize-javascript: CPU 枯渇 DoS 修正（Medium、7.1.1 へ更新、GHSA-qj8w-gfj5-8c6v）
+  - picomatch: POSIX 文字クラスのメソッドインジェクション修正（Medium、2.3.2 へ更新、GHSA-3v7f-55p6-f55p）
+
+## [0.2.8] - 2026-03-14
+
+### Fixed
+- serialize-javascript の RCE 脆弱性を修正（GHSA-5c6j-r48x-rmvq、overrides で ^7.0.3 を強制）
+- diff の DoS 脆弱性を修正（GHSA-73rr-hh4g-fpgx、overrides で ^8.0.3 を強制）
+
 ## [0.2.7] - 2026-03-14
 
 ### Fixed
