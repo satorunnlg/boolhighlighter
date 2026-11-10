@@ -4,6 +4,12 @@ All notable changes to the "boolhighlighter" extension will be documented in thi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.10] - 2026-11-10
+
+### Fixed
+- Dependabot アラート対応（npm 推移的依存の脆弱性 1 件、拡張機能本体のコード変更なし）
+  - serialize-javascript: 脆弱性修正（Medium、7.1.1 から 7.1.4 へ更新、Dependabot アラート #46、修正版は 7.1.2 以上）
+
 ## [0.2.9] - 2026-09-21
 
 ### Fixed
